@@ -191,7 +191,7 @@ Sub 设置签到人()
     Dim iRight = Table[1]["right"]
     Dim iBottom = Table[1]["bottom"]
     Delay 100  //等待页面、网络加载
-    Touch iLeft+158, iTop+15, 100
+    Touch iLeft+150, iTop+15, 100           //修改这里，实现点击不同的人 
     TracePrint "点击指定签到人完成"
     Delay 200
 End Sub
