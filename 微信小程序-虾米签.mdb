@@ -1,0 +1,305 @@
+// 【小米9SE MIUI14签到】
+// 完全还原录制轨迹
+// 精准时序控制
+
+// 主程序
+Call 小米安全唤醒()
+Delay 1280
+Call 精准滑动还原()
+Delay 1000
+// 获取系统当前时间
+Dim 当前小时 = DateTime.Hour()
+Dim 当前分钟 = DateTime.Minute()
+
+' 输出调试信息，检查当前时间
+TracePrint "当前时间: " & 当前小时 & ":" & 当前分钟
+' 判断早上签到时间段 (7:30 - 8:50)
+If 当前小时 >= 7 And 当前小时 < 9 Then
+    If 当前小时 = 7 And 当前分钟 >= 30 Or 当前小时 = 8 And 当前分钟 < 50 Then 
+        Call 点击今天()
+        Call 点击早上签到()
+        Call 点击开始签到()
+        Call 设置签到人()
+        Call 精准滑动还原()
+        Call 点击获取定位()
+        Call 点击勾选协议()
+        Call 提交签到()
+        Call 表单确认()
+        Call 关签到完成广告()
+        Call 返回()
+        Call 熄屏()
+    End If
+End If
+
+' 判断下午签到时间段 (16:00 - 18:00)
+If 当前小时 >= 16 And 当前小时 < 18 Then 
+    Call 点击今天()
+    Call 点击下午签到()
+    Call 点击开始签到()
+    Call 设置签到人()
+    Call 精准滑动还原()
+    Call 点击获取定位()
+    Call 点击勾选协议()
+    Call 提交签到()
+    Call 表单确认()
+    Call 关签到完成广告()
+    Call 返回()
+    Call 熄屏()
+End If
+
+' 如果不在签到时间，运行不在签到时间
+If (当前小时 < 7 Or 当前小时 > 8 And 当前小时 < 16 Or 当前小时 >= 18) Then
+    Call 不在签到时间()
+End If
+
+EndScript
+
+// ========== 子程序 ==========
+Sub 小米安全唤醒()
+    // 3.7.4版正确电源键写法
+    KeyPress "Power"  // 直接使用按键名称
+    Delay 500
+    TracePrint "唤醒操作完成"
+End Sub
+
+Sub 熄屏()
+    Delay 500
+    // 3.7.4版正确电源键写法
+    KeyPress "Power"  // 直接使用按键名称
+    Delay 100
+    TracePrint "熄屏完成"
+End Sub
+
+Sub 精准滑动还原()
+    // 初始化触控点
+    TouchDown 911, 1989, 0
+    Delay 67
+    
+    // 精确轨迹还原（逐帧转换）
+    Call 滑动轨迹(911,1977,67)
+    Call 滑动轨迹(912,1955,8)
+    Call 滑动轨迹(915,1926,9)
+    Call 滑动轨迹(919,1901,8)
+    Call 滑动轨迹(923,1882,8)
+    Call 滑动轨迹(927,1864,9)
+    Call 滑动轨迹(932,1849,8)
+    Call 滑动轨迹(936,1832,8)
+    Call 滑动轨迹(942,1816,9)
+    Call 滑动轨迹(947,1800,8)
+    Call 滑动轨迹(952,1784,8)
+    Call 滑动轨迹(956,1768,9)
+    Call 滑动轨迹(961,1751,8)
+    Call 滑动轨迹(965,1734,9)
+    Call 滑动轨迹(971,1717,8)
+    Call 滑动轨迹(976,1702,8)
+    Call 滑动轨迹(981,1686,9)
+    Call 滑动轨迹(986,1669,8)
+    Call 滑动轨迹(990,1653,9)
+    Call 滑动轨迹(994,1638,8)
+    Call 滑动轨迹(999, 1622, 8)
+    Call 滑动轨迹(1003,1606,9)
+    Call 滑动轨迹(1007,1590,8)
+    Call 滑动轨迹(1010,1573,9)
+    Call 滑动轨迹(1013,1556,8)
+    Call 滑动轨迹(1016,1540,9)
+    Call 滑动轨迹(1018,1523,8)
+    Call 滑动轨迹(1020, 1506, 8)
+    Call 滑动轨迹(1023,1490,8)   // 延续最后一步趋势
+    Call 滑动轨迹(1026,1474,9)   // x+3 y-16
+    Call 滑动轨迹(1030,1458,8)   // x+4 y-16
+    Call 滑动轨迹(1034,1441,9)   // x+4 y-17
+    Call 滑动轨迹(1038,1424,8)   // x+4 y-17
+    TouchUp 0
+    TracePrint "真人轨迹完美还原"
+    Delay 5000
+    //等待5S开屏广告
+End Sub
+	
+Sub 点击今天()
+    Dim Table = element.Find("android.widget.TextView","今天")
+    Dim iId = Table[1]["resource-id"]			//没数据为空 
+    Dim strClass = Table[1]["class"]
+    Dim strText = Table[1]["text"]
+    Dim iLeft = Table[1]["left"]
+    Dim iTop = Table[1]["top"]
+    Dim iRight = Table[1]["right"]
+    Dim iBottom = Table[1]["bottom"]
+    TracePrint "坐标: " & iLeft & ", " & iTop
+    Delay 200  //等待页面、网络加载
+    Touch iLeft+60, iTop+40, 100
+    TracePrint "点击今天完成"
+    Delay 500
+End Sub
+
+Sub 点击早上签到()
+    Dim Table = element.Find("android.widget.TextView","07:30~08:50")
+    Dim iId = Table[1]["resource-id"]			//没数据为空 
+    Dim strClass = Table[1]["class"]
+    Dim strText = Table[1]["text"]
+    Dim iLeft = Table[1]["left"]
+    Dim iTop = Table[1]["top"]
+    Dim iRight = Table[1]["right"]
+    Dim iBottom = Table[1]["bottom"]
+    TracePrint "坐标: " & iLeft & ", " & iTop
+    Delay 200  //等待页面、网络加载
+    Touch iLeft+90, iTop+40, 100
+    TracePrint "点击早上签到时间完成"
+    Delay 500
+End Sub
+
+Sub 点击下午签到()
+    Dim Table = element.Find("android.widget.TextView","16:00~18:00")
+    Dim iId = Table[1]["resource-id"]			//没数据为空 
+    Dim strClass = Table[1]["class"]
+    Dim strText = Table[1]["text"]
+    Dim iLeft = Table[1]["left"]
+    Dim iTop = Table[1]["top"]
+    Dim iRight = Table[1]["right"]
+    Dim iBottom = Table[1]["bottom"]
+    TracePrint "坐标: " & iLeft & ", " & iTop
+    Delay 200  //等待页面、网络加载
+    Touch iLeft+90, iTop+40, 100
+    TracePrint "点击下午签到时间完成"
+    Delay 500
+End Sub
+
+Sub 点击开始签到()
+    //点击开始签到
+    Dim Table = element.Find("android.widget.Button","点击开始签到")
+    Dim iId = Table[1]["resource-id"]			//没数据为空 
+    Dim strClass = Table[1]["class"]
+    Dim strText = Table[1]["text"]
+    Dim iLeft = Table[1]["left"]
+    Dim iTop = Table[1]["top"]
+    Dim iRight = Table[1]["right"]
+    Dim iBottom = Table[1]["bottom"]
+    Delay 500  //等待页面、网络加载
+    Touch iLeft + 312, iTop + 66, 100
+    TracePrint "点击开始签到完成"
+    Delay 1000  //等待页面、网络加载1S
+End Sub
+
+Sub 设置签到人()
+    //设置签到人
+    Dim Table = element.Find("android.widget.TextView","接龙名单")
+    //页面被混淆，只能查找附近元素
+    Dim iId = Table[1]["resource-id"]			//没数据为空 
+    Dim strClass = Table[1]["class"]
+    Dim strText = Table[1]["text"]
+    Dim iLeft = Table[1]["left"]
+    Dim iTop = Table[1]["top"]
+    Dim iRight = Table[1]["right"]
+    Dim iBottom = Table[1]["bottom"]
+    Delay 100  //等待页面、网络加载
+    Touch iLeft+158, iTop+15, 100
+    TracePrint "点击指定签到人完成"
+    Delay 200
+End Sub
+
+Sub 不在签到时间()
+    TracePrint "不在签到时间"
+    Delay 500
+    // 3.7.4版正确电源键写法
+    KeyPress "Power"  // 直接使用按键名称
+End Sub
+
+Sub 点击获取定位()
+    //获取定位
+    Dim Table = element.Find("android.widget.TextView","点击获取定位")
+    Dim iId = Table[1]["resource-id"]			//没数据为空 
+    Dim strClass = Table[1]["class"]
+    Dim strText = Table[1]["text"]
+    Dim iLeft = Table[1]["left"]
+    Dim iTop = Table[1]["top"]
+    Dim iRight = Table[1]["right"]
+    Dim iBottom = Table[1]["bottom"]
+    Delay 100  //等待页面、网络加载
+    Touch iLeft+145, iTop+30, 100
+    TracePrint "获取定位完成"
+    Delay 200
+End Sub
+
+Sub 点击勾选协议()
+    //点击勾选协议
+    Dim Table = element.Find("android.widget.TextView","我已阅读并接受")
+    Dim iId = Table[1]["resource-id"]			//没数据为空 
+    Dim strClass = Table[1]["class"]
+    Dim strText = Table[1]["text"]
+    Dim iLeft = Table[1]["left"]
+    Dim iTop = Table[1]["top"]
+    Dim iRight = Table[1]["right"]
+    Dim iBottom = Table[1]["bottom"]
+    Delay 100  //等待页面、网络加载
+    Touch iLeft-27, iTop+22, 100
+    TracePrint "点击勾选协议完成"
+    Delay 200
+End Sub
+
+Sub 提交签到()
+    //提交签到
+    Dim Table = element.Find("android.widget.Button","点击开始签到")
+    Dim iId = Table[1]["resource-id"]			//没数据为空 
+    Dim strClass = Table[1]["class"]
+    Dim strText = Table[1]["text"]
+    Dim iLeft = Table[1]["left"]
+    Dim iTop = Table[1]["top"]
+    Dim iRight = Table[1]["right"]
+    Dim iBottom = Table[1]["bottom"]
+    Delay 100  //等待页面、网络加载
+    Touch iLeft+315, iTop+38, 100
+    TracePrint "提交签到完成"
+    Delay 200
+End Sub
+
+Sub 表单确认()
+    //表单确认
+    Dim Table = element.Find("android.widget.TextView","公众号如何关联小程序？")
+    Dim iId = Table[1]["resource-id"]			//没数据为空 
+    Dim strClass = Table[1]["class"]
+    Dim strText = Table[1]["text"]
+    Dim iLeft = Table[1]["left"]
+    Dim iTop = Table[1]["top"]
+    Dim iRight = Table[1]["right"]
+    Dim iBottom = Table[1]["bottom"]
+    Delay 100  //等待页面、网络加载
+    Touch iRight, iBottom, 300
+    TracePrint "表单确认完成"
+    Delay 200
+End Sub
+
+Sub 关签到完成广告()
+    //表单确认
+    Dim Table = element.Find("android.widget.TextView","分享本次签到")
+    Dim iId = Table[1]["resource-id"]			//没数据为空 
+    Dim strClass = Table[1]["class"]
+    Dim strText = Table[1]["text"]
+    Dim iLeft = Table[1]["left"]
+    Dim iTop = Table[1]["top"]
+    Dim iRight = Table[1]["right"]
+    Dim iBottom = Table[1]["bottom"]
+    Delay 100  //等待页面、网络加载
+    Touch iRight, iBottom, 300
+    TracePrint "广告关闭完成"
+    Delay 200
+End Sub
+
+Sub 返回()
+    //返回
+    Dim Table = element.Find("android.widget.TextView","")
+    Dim iId = Table[1]["resource-id"]			//没数据为空 
+    Dim strClass = Table[1]["class"]
+    Dim strText = Table[1]["text"]
+    Dim iLeft = Table[1]["left"]
+    Dim iTop = Table[1]["top"]
+    Dim iRight = Table[1]["right"]
+    Dim iBottom = Table[1]["bottom"]
+    Delay 100  //等待页面、网络加载
+    Touch iRight, iBottom, 300
+    TracePrint "返回完成"
+    Delay 200
+End Sub
+
+Sub 滑动轨迹(x, y, delayTime)
+    TouchMove x, y, 0
+    Delay delayTime
+End Sub
