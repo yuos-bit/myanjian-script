@@ -1,0 +1,22 @@
+# 忽略 tools 目录下的压缩包和 JDK 环境
+tools/*.zip
+tools/jdk-17.0.20.1+1/
+tools/jdk/
+
+# 其他非必要大文件 / 可重新下载的内容
+tools/android-sdk/
+tools/Tesseract4Android/
+tools/*.tar.gz
+tools/*.aar
+tools/chi_sim.traineddata
+
+# 构建产物
+build/
+*.apk
+*.idsig
+
+# 签名密钥(含密码,不入库;由 build.sh 首次构建时自动生成,请另行备份)
+keystore.jks
+
+# 本地配置
+.claude/settings.local.json

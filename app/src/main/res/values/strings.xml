@@ -1,0 +1,5 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">自动打卡</string>
+    <string name="acc_desc">自动打卡：读取屏幕文字并按设定时间自动完成签到流程</string>
+</resources>

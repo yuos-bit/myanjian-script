@@ -1,0 +1,113 @@
+# 手动编译 Tesseract4Android 源码并发布 AAR 到 Releases
+# 触发方式: Actions 页面 -> Build Tesseract4Android -> Run workflow (输入版本号, 默认 4.9.0)
+# 产物: tesseract4android-<版本>.aar (minSdk 26, 即安卓 8.0+)
+# 发布: 在本仓库创建 tag Tesseract4Android-<版本> 并附带 AAR
+
+name: Build Tesseract4Android
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Tesseract4Android 版本号 (对应上游 tag, 如 4.9.0)'
+        required: true
+        default: '4.9.0'
+
+# 创建 Release / tag 需要写权限
+permissions:
+  contents: write
+
+env:
+  # 与上游 tesseract4android/build.gradle 声明的工具链保持一致
+  NDK_VERSION: '27.2.12479018'
+  CMAKE_VERSION: '3.22.1'
+  COMPILE_SDK: '35'
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: 校验版本号 (防止注入)
+        env:
+          VERSION: ${{ inputs.version }}
+        run: |
+          if ! [[ "$VERSION" =~ ^[0-9A-Za-z._-]+$ ]]; then
+            echo "::error::非法版本号: $VERSION (仅允许字母数字 . _ -)"
+            exit 1
+          fi
+          echo "VER=$VERSION" >> "$GITHUB_ENV"
+
+      - name: 拉取上游源码
+        run: |
+          set -e
+          curl -sL --retry 3 --fail \
+            -o src.tar.gz \
+            "https://github.com/adaptech-cz/Tesseract4Android/archive/refs/tags/${VER}.tar.gz"
+          tar xzf src.tar.gz
+          cd "Tesseract4Android-${VER}"
+
+          # 安卓 8.0+ 要求 minSdk >= 26 (上游默认 21)
+          sed -i 's/minSdk 21/minSdk 26/' tesseract4android/build.gradle
+          grep -n 'minSdk' tesseract4android/build.gradle
+
+          echo "SRC_DIR=$PWD" >> "$GITHUB_ENV"
+
+      - name: 安装 JDK 17 (AGP 8.10.1 要求) 并缓存 Gradle
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+          cache: gradle
+
+      - name: 安装 Android NDK / CMake / SDK Platform
+        run: |
+          set -e
+          sdkmanager --install \
+            "ndk;${NDK_VERSION}" \
+            "cmake;${CMAKE_VERSION}" \
+            "platforms;android-${COMPILE_SDK}" \
+            "build-tools;35.0.0" > /dev/null
+          yes | sdkmanager --licenses > /dev/null || true
+
+      - name: 编译 standardRelease AAR
+        run: |
+          set -e
+          cd "$SRC_DIR"
+          chmod +x gradlew
+          # JITPACK=1: settings.gradle 据此跳过 sample 模块, 只编译库本体
+          JITPACK=1 ./gradlew \
+            :tesseract4android:assembleStandardRelease \
+            --no-daemon --stacktrace
+          echo "---- 产物 ----"
+          find tesseract4android/build/outputs/aar -type f -name '*.aar'
+
+      - name: 重命名为 tesseract4android-<版本>.aar
+        run: |
+          set -e
+          SRC_AAR="$SRC_DIR/tesseract4android/build/outputs/aar/tesseract4android-standard-release.aar"
+          [ -f "$SRC_AAR" ] || { echo "::error::未找到编译产物 AAR"; exit 1; }
+          cp -f "$SRC_AAR" "tesseract4android-${VER}.aar"
+          ls -la "tesseract4android-${VER}.aar"
+
+      - name: 上传构建产物 (Actions Artifact, 便于调试)
+        uses: actions/upload-artifact@v4
+        with:
+          name: tesseract4android-${{ env.VER }}
+          path: tesseract4android-${{ env.VER }}.aar
+          if-no-files-found: error
+
+      - name: 发布到 Releases (自动创建 tag Tesseract4Android-<版本>)
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: Tesseract4Android-${{ env.VER }}
+          name: Tesseract4Android-${{ env.VER }}
+          body: |
+            Tesseract4Android ${{ env.VER }} 自动编译产物
+
+            - 上游源码: https://github.com/adaptech-cz/Tesseract4Android/tree/${{ env.VER }}
+            - 编译目标: standardRelease (无 OpenMP)
+            - minSdk 26 (安卓 8.0+), compileSdk 35
+            - 包含 ABI: armeabi-v7a / arm64-v8a / x86 / x86_64
+          files: tesseract4android-${{ env.VER }}.aar
+          fail_on_unmatched_files: true
