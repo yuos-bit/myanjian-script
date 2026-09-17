@@ -1,6 +1,8 @@
 # 自动打卡 APK
 
 安卓端自动签到脚本，带 UI 面板。目标系统：Android 8.0+，自签证书签名。
+![](https://free.picui.cn/free/8480/2026/09/17/6aabb7f45f425.jpg)
+![](https://free.picui.cn/free/8480/2026/09/17/6aabb7f2b2cd3.jpg)
 
 ## 使用步骤
 

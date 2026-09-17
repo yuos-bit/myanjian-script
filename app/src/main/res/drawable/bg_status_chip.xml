@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- 今日状态徽标：浅琥珀药丸 -->
+<shape xmlns:android="http://schemas.android.com/apk/res/android"
+    android:shape="rectangle">
+    <solid android:color="@color/brand_amber_bg"/>
+    <corners android:radius="20dp"/>
+</shape>

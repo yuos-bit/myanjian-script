@@ -1,4 +1,21 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <color name="ic_launcher_background">#FFFFFF</color>
+
+    <!-- 品牌色板：青绿系（呼应签到成功色），安静的效率工具气质 -->
+    <color name="brand_primary">#00796B</color>
+    <color name="brand_primary_deep">#004D40</color>
+    <color name="brand_primary_light">#4DB6A2</color>
+    <color name="brand_surface">#F4F9F6</color>
+    <color name="brand_card">#FFFFFF</color>
+    <color name="brand_on_surface">#17251F</color>
+    <color name="brand_on_variant">#54685E</color>
+    <color name="brand_tonal">#DCEFE8</color>
+    <color name="brand_tonal_pressed">#C4E2D8</color>
+    <color name="brand_stroke">#D9E5DE</color>
+    <color name="brand_amber">#9A5B00</color>
+    <color name="brand_amber_bg">#FFF2DC</color>
+    <color name="brand_log_bg">#111716</color>
+    <color name="brand_log_text">#BFE5D6</color>
+    <color name="brand_on_primary">#FFFFFF</color>
 </resources>

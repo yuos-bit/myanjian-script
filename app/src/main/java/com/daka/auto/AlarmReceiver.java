@@ -72,6 +72,15 @@ public class AlarmReceiver extends BroadcastReceiver {
         // 触发后立刻重新安排明天的同一时间
         scheduleAll(ctx);
 
+        // 仅工作日打卡：本地缓存的假期安排显示今天是休息日时，直接跳过（不唤醒屏幕）
+        // 缓存无法确定时继续执行，由服务端联网复核
+        SharedPreferences p = ctx.getSharedPreferences("daka", Context.MODE_PRIVATE);
+        if (p.getBoolean("workday_only", true) && !HolidayHelper.isWorkdayCached(ctx)) {
+            DakaAccessibilityService.appendLog("今天是"
+                    + HolidayHelper.todayLabel(ctx, false) + "，仅工作日打卡已启用，本次任务跳过");
+            return;
+        }
+
         // 1. 唤醒屏幕
         PowerManager pm = (PowerManager) ctx.getSystemService(Context.POWER_SERVICE);
         if (pm != null) {
@@ -95,9 +104,10 @@ public class AlarmReceiver extends BroadcastReceiver {
         } catch (Throwable ignored) {
         }
 
-        // 交给无障碍服务执行完整流程
+        // 交给无障碍服务执行完整流程（scheduled=true：服务端会联网复核节假日）
         Intent svc = new Intent(ctx, DakaAccessibilityService.class);
         svc.setAction(DakaAccessibilityService.ACTION_RUN);
+        svc.putExtra("scheduled", true);
         if (Build.VERSION.SDK_INT >= 26) {
             ctx.startForegroundService(svc);
         } else {

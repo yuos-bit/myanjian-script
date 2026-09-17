@@ -2,153 +2,397 @@
 <ScrollView xmlns:android="http://schemas.android.com/apk/res/android"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
-    android:fillViewport="true">
+    android:background="@color/brand_surface"
+    android:fillViewport="true"
+    android:scrollbars="none">
 
     <LinearLayout
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:orientation="vertical"
-        android:padding="16dp">
+        android:orientation="vertical">
 
-        <TextView
-            android:id="@+id/tv_title"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:text="@string/app_name"
-            android:textSize="22sp"
-            android:textStyle="bold"/>
-
-        <TextView
-            android:id="@+id/tv_version"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:textColor="#888888"
-            android:textSize="12sp"/>
-
-        <TextView
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:layout_marginTop="4dp"
-            android:text="请先开启无障碍服务，再启用定时打卡"
-            android:textSize="13sp"/>
-
+        <!-- ===== 顶栏（hero）：渐变 + 底部大圆角 ===== -->
         <LinearLayout
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:layout_marginTop="16dp"
-            android:gravity="center_vertical"
-            android:orientation="horizontal">
+            android:background="@drawable/bg_header"
+            android:orientation="vertical"
+            android:paddingLeft="22dp"
+            android:paddingTop="18dp"
+            android:paddingRight="22dp"
+            android:paddingBottom="26dp">
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:gravity="center_vertical"
+                android:orientation="horizontal">
+
+                <TextView
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="1"
+                    android:text="自动打卡"
+                    android:textColor="@color/brand_on_primary"
+                    android:textSize="26sp"
+                    android:textStyle="bold"/>
+
+                <TextView
+                    android:id="@+id/tv_version"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:background="@drawable/bg_chip"
+                    android:paddingLeft="12dp"
+                    android:paddingTop="4dp"
+                    android:paddingRight="12dp"
+                    android:paddingBottom="4dp"
+                    android:text="版本"
+                    android:textColor="@color/brand_on_primary"
+                    android:textSize="12sp"/>
+            </LinearLayout>
 
             <TextView
-                android:layout_width="0dp"
-                android:layout_height="wrap_content"
-                android:layout_weight="1"
-                android:text="早上打卡时间"
-                android:textSize="16sp"/>
-
-            <Button
-                android:id="@+id/btn_morning"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:text="08:00"/>
+                android:layout_marginTop="4dp"
+                android:text="微信小程序定时签到 · 静默执行"
+                android:textColor="#D8EFE8"
+                android:textSize="13sp"/>
         </LinearLayout>
 
         <LinearLayout
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:gravity="center_vertical"
-            android:orientation="horizontal">
+            android:orientation="vertical"
+            android:padding="16dp">
 
-            <TextView
-                android:layout_width="0dp"
+            <!-- ===== 主开关卡 ===== -->
+            <LinearLayout
+                android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:layout_weight="1"
-                android:text="晚上打卡时间"
-                android:textSize="16sp"/>
+                android:background="@drawable/bg_card"
+                android:orientation="vertical"
+                android:padding="18dp">
 
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:gravity="center_vertical"
+                    android:orientation="horizontal">
+
+                    <TextView
+                        android:layout_width="0dp"
+                        android:layout_height="wrap_content"
+                        android:layout_weight="1"
+                        android:text="启用定时打卡"
+                        android:textColor="@color/brand_on_surface"
+                        android:textSize="16sp"
+                        android:textStyle="bold"/>
+
+                    <Switch
+                        android:id="@+id/sw_enable"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"/>
+                </LinearLayout>
+
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="4dp"
+                    android:text="开启后每天按下方时间自动唤醒并完成签到"
+                    android:textColor="@color/brand_on_variant"
+                    android:textSize="12sp"/>
+            </LinearLayout>
+
+            <!-- ===== 时间设置卡 ===== -->
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="14dp"
+                android:background="@drawable/bg_card"
+                android:orientation="vertical"
+                android:padding="18dp">
+
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="打卡时间"
+                    android:textColor="@color/brand_on_surface"
+                    android:textSize="16sp"
+                    android:textStyle="bold"/>
+
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="12dp"
+                    android:gravity="center_vertical"
+                    android:orientation="horizontal">
+
+                    <TextView
+                        android:layout_width="0dp"
+                        android:layout_height="wrap_content"
+                        android:layout_weight="1"
+                        android:text="早上"
+                        android:textColor="@color/brand_on_variant"
+                        android:textSize="14sp"/>
+
+                    <Button
+                        android:id="@+id/btn_morning"
+                        android:layout_width="wrap_content"
+                        android:layout_height="44dp"
+                        android:background="@drawable/bg_btn_tonal"
+                        android:minWidth="112dp"
+                        android:text="08:00:00"
+                        android:textColor="@color/brand_primary"
+                        android:textSize="15sp"
+                        android:textStyle="bold"/>
+                </LinearLayout>
+
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="10dp"
+                    android:gravity="center_vertical"
+                    android:orientation="horizontal">
+
+                    <TextView
+                        android:layout_width="0dp"
+                        android:layout_height="wrap_content"
+                        android:layout_weight="1"
+                        android:text="晚上"
+                        android:textColor="@color/brand_on_variant"
+                        android:textSize="14sp"/>
+
+                    <Button
+                        android:id="@+id/btn_evening"
+                        android:layout_width="wrap_content"
+                        android:layout_height="44dp"
+                        android:background="@drawable/bg_btn_tonal"
+                        android:minWidth="112dp"
+                        android:text="17:00:00"
+                        android:textColor="@color/brand_primary"
+                        android:textSize="15sp"
+                        android:textStyle="bold"/>
+                </LinearLayout>
+            </LinearLayout>
+
+            <!-- ===== 仅工作日卡 ===== -->
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="14dp"
+                android:background="@drawable/bg_card"
+                android:orientation="vertical"
+                android:padding="18dp">
+
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:gravity="center_vertical"
+                    android:orientation="horizontal">
+
+                    <TextView
+                        android:layout_width="0dp"
+                        android:layout_height="wrap_content"
+                        android:layout_weight="1"
+                        android:text="仅工作日打卡"
+                        android:textColor="@color/brand_on_surface"
+                        android:textSize="16sp"
+                        android:textStyle="bold"/>
+
+                    <Switch
+                        android:id="@+id/sw_workday"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:checked="true"/>
+                </LinearLayout>
+
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="4dp"
+                    android:text="法定节假日自动跳过，调休补班日照常打卡；假期安排联网自动更新"
+                    android:textColor="@color/brand_on_variant"
+                    android:textSize="12sp"/>
+
+                <TextView
+                    android:id="@+id/tv_holiday"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="10dp"
+                    android:background="@drawable/bg_status_chip"
+                    android:paddingLeft="12dp"
+                    android:paddingTop="5dp"
+                    android:paddingRight="12dp"
+                    android:paddingBottom="5dp"
+                    android:text="今天：检测中…"
+                    android:textColor="@color/brand_amber"
+                    android:textSize="12sp"/>
+            </LinearLayout>
+
+            <!-- ===== 目标设置卡 ===== -->
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="14dp"
+                android:background="@drawable/bg_card"
+                android:orientation="vertical"
+                android:padding="18dp">
+
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="签到目标"
+                    android:textColor="@color/brand_on_surface"
+                    android:textSize="16sp"
+                    android:textStyle="bold"/>
+
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="10dp"
+                    android:text="兜底启动的应用包名（默认微信，仅当最近任务恢复失败时启动）"
+                    android:textColor="@color/brand_on_variant"
+                    android:textSize="12sp"/>
+
+                <EditText
+                    android:id="@+id/et_pkg"
+                    android:layout_width="match_parent"
+                    android:layout_height="44dp"
+                    android:layout_marginTop="6dp"
+                    android:background="@drawable/bg_input"
+                    android:inputType="text"
+                    android:paddingLeft="12dp"
+                    android:paddingRight="12dp"
+                    android:singleLine="true"
+                    android:textSize="14sp"/>
+
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="12dp"
+                    android:text="窗口标题关键字（从最近任务中找到含此名称的窗口并恢复，需提前扫码进入并锁定窗口）"
+                    android:textColor="@color/brand_on_variant"
+                    android:textSize="12sp"/>
+
+                <EditText
+                    android:id="@+id/et_mini"
+                    android:layout_width="match_parent"
+                    android:layout_height="44dp"
+                    android:layout_marginTop="6dp"
+                    android:background="@drawable/bg_input"
+                    android:inputType="text"
+                    android:paddingLeft="12dp"
+                    android:paddingRight="12dp"
+                    android:singleLine="true"
+                    android:textSize="14sp"/>
+            </LinearLayout>
+
+            <!-- ===== 操作区 ===== -->
             <Button
-                android:id="@+id/btn_evening"
-                android:layout_width="wrap_content"
+                android:id="@+id/btn_run"
+                android:layout_width="match_parent"
+                android:layout_height="52dp"
+                android:layout_marginTop="18dp"
+                android:background="@drawable/bg_btn_primary"
+                android:text="立即执行一次"
+                android:textColor="@color/brand_on_primary"
+                android:textSize="16sp"
+                android:textStyle="bold"/>
+
+            <LinearLayout
+                android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:text="17:00"/>
+                android:layout_marginTop="12dp"
+                android:orientation="horizontal">
+
+                <Button
+                    android:id="@+id/btn_acc"
+                    android:layout_width="0dp"
+                    android:layout_height="46dp"
+                    android:layout_marginRight="6dp"
+                    android:layout_weight="1"
+                    android:background="@drawable/bg_btn_tonal"
+                    android:text="打开无障碍设置"
+                    android:textColor="@color/brand_primary"
+                    android:textSize="13sp"/>
+
+                <Button
+                    android:id="@+id/btn_battery"
+                    android:layout_width="0dp"
+                    android:layout_height="46dp"
+                    android:layout_marginLeft="6dp"
+                    android:layout_weight="1"
+                    android:background="@drawable/bg_btn_tonal"
+                    android:text="忽略电池优化"
+                    android:textColor="@color/brand_primary"
+                    android:textSize="13sp"/>
+            </LinearLayout>
+
+            <!-- ===== 运行日志卡：固定高度 + 内部滚动 ===== -->
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="18dp"
+                android:layout_marginBottom="20dp"
+                android:background="@drawable/bg_card"
+                android:orientation="vertical"
+                android:padding="18dp">
+
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:gravity="center_vertical"
+                    android:orientation="horizontal">
+
+                    <TextView
+                        android:layout_width="0dp"
+                        android:layout_height="wrap_content"
+                        android:layout_weight="1"
+                        android:text="运行日志"
+                        android:textColor="@color/brand_on_surface"
+                        android:textSize="16sp"
+                        android:textStyle="bold"/>
+
+                    <Button
+                        android:id="@+id/btn_copy_log"
+                        android:layout_width="wrap_content"
+                        android:layout_height="36dp"
+                        android:background="@drawable/bg_btn_tonal"
+                        android:minWidth="0dp"
+                        android:paddingLeft="14dp"
+                        android:paddingRight="14dp"
+                        android:text="复制全部"
+                        android:textColor="@color/brand_primary"
+                        android:textSize="12sp"/>
+                </LinearLayout>
+
+                <ScrollView
+                    android:id="@+id/sv_log"
+                    android:layout_width="match_parent"
+                    android:layout_height="220dp"
+                    android:layout_marginTop="12dp"
+                    android:background="@drawable/bg_log"
+                    android:fillViewport="true"
+                    android:padding="12dp"
+                    android:requiresFadingEdge="vertical"
+                    android:scrollbarStyle="insideOverlay"
+                    android:scrollbarThumbVertical="@drawable/log_scrollbar_thumb"
+                    android:scrollbarTrackVertical="@drawable/log_scrollbar_track"
+                    android:scrollbars="vertical">
+
+                    <TextView
+                        android:id="@+id/tv_log"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:fontFamily="monospace"
+                        android:text="暂无日志"
+                        android:textColor="@color/brand_log_text"
+                        android:textIsSelectable="true"
+                        android:textSize="11sp"
+                        android:lineSpacingExtra="2dp"/>
+                </ScrollView>
+            </LinearLayout>
         </LinearLayout>
-
-        <CheckBox
-            android:id="@+id/chk_enable"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:layout_marginTop="8dp"
-            android:text="启用定时打卡"/>
-
-        <TextView
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:layout_marginTop="8dp"
-            android:text="兜底启动的应用包名（默认微信，仅当最近任务恢复失败时启动）"
-            android:textSize="12sp"/>
-
-        <EditText
-            android:id="@+id/et_pkg"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:hint="com.tencent.mm"
-            android:inputType="text"
-            android:textSize="14sp"/>
-
-        <TextView
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:layout_marginTop="8dp"
-            android:text="窗口标题关键字（从最近任务中找到含此名称的窗口并恢复，需提前扫码进入并锁定窗口）"
-            android:textSize="12sp"/>
-
-        <EditText
-            android:id="@+id/et_mini"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:hint="虾米签"
-            android:inputType="text"
-            android:textSize="14sp"/>
-
-        <Button
-            android:id="@+id/btn_run"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:layout_marginTop="8dp"
-            android:text="立即执行一次"/>
-
-        <Button
-            android:id="@+id/btn_acc"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:text="打开无障碍设置"/>
-
-        <Button
-            android:id="@+id/btn_battery"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:text="忽略电池优化（防止定时被杀）"/>
-
-        <TextView
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:layout_marginTop="12dp"
-            android:text="运行日志："
-            android:textStyle="bold"/>
-
-        <Button
-            android:id="@+id/btn_copy_log"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:layout_marginTop="4dp"
-            android:text="复制全部日志"/>
-
-        <TextView
-            android:id="@+id/tv_log"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:fontFamily="monospace"
-            android:textIsSelectable="true"
-            android:textSize="12sp"/>
     </LinearLayout>
 </ScrollView>

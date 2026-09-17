@@ -67,6 +67,11 @@ public class DakaAccessibilityService extends AccessibilityService {
         }
     }
 
+    /** 供其他组件（如闹钟接收器）写入运行日志 */
+    public static void appendLog(String msg) {
+        log(msg);
+    }
+
     private static void log(String msg) {
         String line = new SimpleDateFormat("MM-dd HH:mm:ss", Locale.CHINA)
                 .format(new Date()) + "  " + msg + "\n";
@@ -100,10 +105,13 @@ public class DakaAccessibilityService extends AccessibilityService {
     public void onInterrupt() {
     }
 
+    private volatile boolean mScheduledRun = false;
+
     @Override
     public int onStartCommand(Intent intent, int flags, int startId) {
         if (intent != null && ACTION_RUN.equals(intent.getAction())) {
             startForeground(1, buildNotification());
+            mScheduledRun = intent.getBooleanExtra("scheduled", false);
             if (mRunning) {
                 log("已有任务在运行，忽略本次触发");
             } else {
@@ -123,6 +131,19 @@ public class DakaAccessibilityService extends AccessibilityService {
 
     private void runTask() {
         try {
+            // 仅工作日打卡（定时触发时）：联网复核今日是否为法定节假日/周末
+            // （闹钟接收器已用本地缓存预判过，这里兜底处理缓存缺失或过期的情况）
+            if (mScheduledRun && getSharedPreferences("daka", MODE_PRIVATE)
+                    .getBoolean("workday_only", true)) {
+                String label = HolidayHelper.todayLabel(this, true);
+                if (!HolidayHelper.isWorkdayToday(this)) {
+                    log("今天是" + label + "，仅工作日打卡已启用，本次任务跳过");
+                    showToast("今天是" + label + "，已跳过打卡");
+                    return;
+                }
+                log("今天是" + label + "，工作日打卡正常执行");
+            }
+
             // 0. 读取屏幕分辨率
             int[] res = getResolution();
             log("屏幕分辨率: " + res[0] + "x" + res[1]);
