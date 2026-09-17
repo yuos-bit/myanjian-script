@@ -2,6 +2,8 @@ package com.daka.auto;
 
 import android.app.Activity;
 import android.app.AlertDialog;
+import android.content.ClipData;
+import android.content.ClipboardManager;
 import android.content.DialogInterface;
 import android.content.Intent;
 import android.content.SharedPreferences;
@@ -30,6 +32,14 @@ public class MainActivity extends Activity {
     private EditText etPkg, etMini;
     private TextView tvLog;
     private boolean editingPkg = false;
+    private final android.os.Handler mLogRefresher = new android.os.Handler();
+    private final Runnable mLogRefreshTask = new Runnable() {
+        @Override
+        public void run() {
+            refreshLog();
+            mLogRefresher.postDelayed(this, 1000);
+        }
+    };
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -106,12 +116,50 @@ public class MainActivity extends Activity {
         findViewById(R.id.btn_acc).setOnClickListener(v ->
                 startActivity(new Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS)));
         findViewById(R.id.btn_battery).setOnClickListener(v -> requestIgnoreBattery());
+
+        findViewById(R.id.btn_copy_log).setOnClickListener(v -> copyLog());
+    }
+
+    /** 复制全部运行日志到剪贴板：先刷新显示，再复制同一份快照，保证所见即所复 */
+    private void copyLog() {
+        String log = DakaAccessibilityService.getLog();
+        String shown = log.isEmpty() ? "暂无日志" : log;
+        tvLog.setText(shown);
+        if (log.isEmpty()) {
+            Toast.makeText(this, "暂无日志可复制", Toast.LENGTH_SHORT).show();
+            return;
+        }
+        ClipboardManager cm = (ClipboardManager) getSystemService(CLIPBOARD_SERVICE);
+        if (cm == null) {
+            Toast.makeText(this, "剪贴板不可用", Toast.LENGTH_SHORT).show();
+            return;
+        }
+        cm.setPrimaryClip(ClipData.newPlainText("运行日志", log));
+        Toast.makeText(this, "日志已复制到剪贴板", Toast.LENGTH_SHORT).show();
     }
 
     @Override
     protected void onResume() {
         super.onResume();
         updateUi();
+        // 日志在任务执行期间持续增长，定时刷新保证显示与实际日志一致
+        mLogRefresher.postDelayed(mLogRefreshTask, 1000);
+    }
+
+    @Override
+    protected void onPause() {
+        super.onPause();
+        mLogRefresher.removeCallbacks(mLogRefreshTask);
+    }
+
+    /** 用当前日志快照刷新显示 */
+    private void refreshLog() {
+        String log = DakaAccessibilityService.getLog();
+        String shown = tvLog.getText().toString();
+        String next = log.isEmpty() ? "暂无日志" : log;
+        if (!next.equals(shown)) {
+            tvLog.setText(next);
+        }
     }
 
     private void updateUi() {

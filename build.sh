@@ -45,8 +45,8 @@ echo "==> [2/6] aapt2 链接资源并生成 R.java"
     build/res.zip
 
 echo "==> [3/6] javac 编译 Java 源码"
-# OCR（Tesseract 4.0 + LSTM）：解包 tesseract4android AAR 供编译和打包使用
-AAR="$ROOT/tools/tesseract4android-2.0.0.aar"
+# OCR（Tesseract 4.9.0 / LSTM）：解包 tesseract4android AAR 供编译和打包使用
+AAR="$ROOT/tools/Tesseract4Android/tesseract4android-4.9.0.aar"
 rm -rf "$OUT/tess-classes" "$OUT/libs"
 if [ -f "$AAR" ]; then
     mkdir -p "$OUT/tess-classes" "$OUT/libs"
@@ -58,7 +58,7 @@ if [ -f "$AAR" ]; then
             cp -r "$OUT/libs/jni/$abi" "$OUT/libs/lib/$abi"
         fi
     done
-    echo "    已集成 OCR 组件 (tesseract4android / tesseract 4.0.0)"
+    echo "    已集成 OCR 组件 (tesseract4android / tesseract 4.9.0)"
 fi
 
 find app/src/main/java -name "*.java" > build/sources.txt

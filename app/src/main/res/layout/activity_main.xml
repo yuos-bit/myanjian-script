@@ -136,11 +136,19 @@
             android:text="运行日志："
             android:textStyle="bold"/>
 
+        <Button
+            android:id="@+id/btn_copy_log"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="4dp"
+            android:text="复制全部日志"/>
+
         <TextView
             android:id="@+id/tv_log"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:fontFamily="monospace"
+            android:textIsSelectable="true"
             android:textSize="12sp"/>
     </LinearLayout>
 </ScrollView>

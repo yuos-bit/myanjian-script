@@ -26,6 +26,7 @@ import android.view.accessibility.AccessibilityEvent;
 import android.view.accessibility.AccessibilityNodeInfo;
 import android.view.accessibility.AccessibilityWindowInfo;
 import android.widget.TextView;
+import android.widget.Toast;
 
 import java.util.concurrent.Executor;
 
@@ -34,6 +35,9 @@ import java.util.ArrayList;
 import java.util.Date;
 import java.util.List;
 import java.util.Locale;
+import java.util.TimeZone;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 import java.util.concurrent.Callable;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
@@ -50,6 +54,7 @@ public class DakaAccessibilityService extends AccessibilityService {
     private final Handler mMain = new Handler(Looper.getMainLooper());
     private volatile boolean mRunning = false;
     private TextView mOverlay;
+    private String mOverlayText;
     private PowerManager.WakeLock mWakeLock;
 
     public static boolean isConnected() {
@@ -181,41 +186,84 @@ public class DakaAccessibilityService extends AccessibilityService {
             log("第一次读取页面文字: " + summarize(page1));
             waitSeconds(3, "读取页面文字");
 
-            // 4. 点击 刷新签到 -> 点击开始签到
+            // 4. 等待2S，点击【刷新签到】，再等1S整页 OCR 判断状态
             waitSeconds(2, "准备点击【刷新签到】");
-            boolean s1 = clickTextWithRetry("刷新签到", 5);
-            waitSeconds(1, "等待【点击开始签到】出现");
-            boolean s2 = clickTextWithRetry("点击开始签到", 5);
-            waitSeconds(2, "进入签到页");
+            clickTextWithRetry("刷新签到", 5);
+            waitSeconds(1, "刷新完成，读取页面状态");
 
-            // 5. 重新读取屏幕文字（弹窗倒计时提示），无障碍读不到时 OCR 兜底
-            String page2 = readScreenWithRetry();
-            if (!page2.contains("签到")) {
-                String ocr2 = ocrScreenText();
-                if (!ocr2.isEmpty()) {
-                    page2 = page2 + " " + ocr2;
-                }
-            }
-            log("第二次读取页面文字: " + summarize(page2));
-
-            // 点击刷新签到后如果仍未开始，直接结束本次任务
-            if (page2.contains("签到未开始")) {
+            String state = ocrScreenText() + " " + ocrBottomBarText();
+            if (state.contains("未开始")) {
+                // "签到未开始"按钮是浅灰字，整页 OCR 可能识别不到，所以合并底部栏专项检测
                 log("检测到【签到未开始】，本次任务结束");
+                showToast("签到未开始，请稍后重试");
                 return;
             }
-            waitSeconds(3, "重新读取页面文字");
 
-            // 6. 点击获取定位 -> 我已阅读
-            boolean s3 = clickTextWithRetry("获取定位", 5);
-            waitSeconds(2, "等待定位弹窗");
-            boolean s4 = clickTextWithRetry("我已阅读", 8);
+            // 5. 出现【点击开始签到】：按当前北京时间选择时间段，点击芯片后等待3S再点击
+            if (state.contains("点击开始签到") || state.contains("开始签到")) {
+                String chip = currentSignInWindow(); // 00:00~08:50 或 16:00~23:59
+                log("当前北京时间属于时间段 " + chip + "，点击对应时间段");
+                clickTimeChip(chip);
+                waitSeconds(3, "等待时间段生效");
+                clickTextWithRetry("点击开始签到", 5);
+            } else {
+                log("未检测到【点击开始签到】，尝试直接继续");
+            }
+            waitSeconds(3, "进入签到页");
 
-            // 7. 等待2S -> 提交
-            waitSeconds(2, "准备提交");
-            boolean s5 = clickTextWithRetry("提交", 8);
+            // 6. 整页 OCR 记录三个目标坐标，按顺序点击：获取定位 -> 等10S -> 我已阅读并同意 -> 等1S -> 提交
+            int[] pLoc = ocrFindCoords("获取定位");
+            int[] pRead = ocrFindCoords("我已阅读");
+            int[] pSubmit = ocrFindCoords("提交");
+            log("记录坐标: 获取定位=" + fmtCoords(pLoc)
+                    + ", 我已阅读并同意=" + fmtCoords(pRead)
+                    + ", 提交=" + fmtCoords(pSubmit));
 
-            boolean ok = s1 && s2 && s3 && s4 && s5;
-            log(ok ? "✔ 打卡流程执行完毕" : "✘ 部分步骤未找到对应按钮，请检查日志");
+            if (pLoc != null) {
+                tapOnMain(pLoc[0], pLoc[1]);
+                log("已点击【获取定位】@ " + pLoc[0] + "," + pLoc[1]);
+            } else {
+                clickTextWithRetry("获取定位", 5);
+            }
+            waitCountdownFromZero(10, "定位中，请稍候");
+
+            if (pRead != null) {
+                tapOnMain(pRead[0], pRead[1]);
+                log("已点击【我已阅读并同意】@ " + pRead[0] + "," + pRead[1]);
+            } else {
+                clickTextWithRetry("我已阅读", 8);
+            }
+            waitSeconds(1, "准备提交");
+
+            if (pSubmit != null) {
+                tapOnMain(pSubmit[0], pSubmit[1]);
+                log("已点击【提交】@ " + pSubmit[0] + "," + pSubmit[1]);
+            } else {
+                clickTextWithRetry("提交", 8);
+            }
+
+            // 7. 等待5S后 OCR 记录【返回打卡页】坐标，等待2S后点击
+            waitSeconds(5, "等待提交结果");
+            int[] pBack = ocrFindCoords("返回打卡页");
+            waitSeconds(2, "准备返回打卡页");
+            if (pBack != null) {
+                tapOnMain(pBack[0], pBack[1]);
+                log("已点击【返回打卡页】@ " + pBack[0] + "," + pBack[1]);
+            } else {
+                log("未找到【返回打卡页】，尝试直接检测签到结果");
+            }
+
+            // 8. 整页 OCR 检测【时间段内已签到】
+            waitSeconds(2, "返回签到页");
+            String result = ocrScreenText() + " " + ocrBottomBarText();
+            if (result.contains("时间段内已签到") || result.contains("已签到")) {
+                String now = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss", Locale.CHINA)
+                        .format(new Date());
+                log("✔ 签到成功，签到时间: " + now);
+                showToast("签到成功");
+            } else {
+                log("✘ 未检测到【时间段内已签到】，请检查日志");
+            }
         } catch (Throwable t) {
             log("执行异常: " + t);
         } finally {
@@ -231,7 +279,7 @@ public class DakaAccessibilityService extends AccessibilityService {
         if (s == null) return "(读取失败)";
         s = s.trim();
         if (s.isEmpty()) return "(页面无文字)";
-        return s.length() > 300 ? s.substring(0, 300) + "…" : s;
+        return s.length() > 600 ? s.substring(0, 600) + "…" : s;
     }
 
     // ---------------- 步骤实现 ----------------
@@ -565,6 +613,9 @@ public class DakaAccessibilityService extends AccessibilityService {
         // 底部栏：右"刷新签到" / 中"点击开始签到"
         FALLBACK_COORDS.put("刷新签到", new double[]{0.926, 0.938});
         FALLBACK_COORDS.put("点击开始签到", new double[]{0.560, 0.938});
+        // 时间段芯片（按 1080x2340 截图 png/1.jpg 实测换算）
+        FALLBACK_COORDS.put("00:00~08:50", new double[]{0.401, 0.527});
+        FALLBACK_COORDS.put("16:00~23:59", new double[]{0.626, 0.527});
     }
 
     /** 按文字查找节点并点击其中心坐标（记录的文字坐标备用），遍历所有窗口 */
@@ -694,12 +745,17 @@ public class DakaAccessibilityService extends AccessibilityService {
             log("OCR 引擎初始化失败");
             return "";
         }
+        // 先隐藏倒计时悬浮窗，避免 OCR 匹配到悬浮窗自身文案后误点/污染识别结果
+        String prevOverlay = hideOverlaySync();
         Bitmap bmp = takeScreenshotSync();
-        if (bmp == null) {
-            return "";
+        String s = "";
+        if (bmp != null) {
+            s = OcrHelper.recognize(bmp, null, null);
+            bmp.recycle();
         }
-        String s = OcrHelper.recognize(bmp, null, null);
-        bmp.recycle();
+        if (prevOverlay != null) {
+            showOverlayOnMain(prevOverlay);
+        }
         if (s != null && !s.isEmpty()) {
             log("OCR 识别: " + summarize(s));
         } else {
@@ -710,46 +766,224 @@ public class DakaAccessibilityService extends AccessibilityService {
 
     /** OCR 定位关键词并点击中心，成功返回 true */
     private boolean ocrClick(String keyword) {
-        if (Build.VERSION.SDK_INT < 30) {
+        int[] hit = ocrLocate(keyword, null);
+        if (hit == null) {
             return false;
+        }
+        tapOnMain(hit[0], hit[1]);
+        log("OCR 定位并点击【" + keyword + "】@ " + hit[0] + "," + hit[1]);
+        return true;
+    }
+
+    /** OCR 定位符合正则的文本并点击中心（用于时间段芯片等写法不稳定的文字），成功返回 true */
+    private boolean ocrClickPattern(final Pattern p, final String desc) {
+        int[] hit = ocrLocate(null, p);
+        if (hit == null) {
+            return false;
+        }
+        tapOnMain(hit[0], hit[1]);
+        log("OCR 定位并点击【" + desc + "】@ " + hit[0] + "," + hit[1]);
+        return true;
+    }
+
+    /** OCR 整页识别关键词并记录其中心坐标（不点击），未找到返回 null */
+    private int[] ocrFindCoords(String keyword) {
+        int[] hit = ocrLocate(keyword, null);
+        if (hit == null) {
+            log("OCR 未找到【" + keyword + "】");
+            return null;
+        }
+        return hit;
+    }
+
+    /**
+     * OCR 定位核心：截图 -> 词级匹配 -> 行级匹配，返回中心坐标 {x, y}；未找到返回 null。
+     * keyword 与 pattern 至少传一个；两者都传时优先按关键词匹配。
+     */
+    private int[] ocrLocate(final String keyword, final Pattern pattern) {
+        if (Build.VERSION.SDK_INT < 30) {
+            return null;
         }
         if (!OcrHelper.init(this)) {
             log("OCR 引擎初始化失败，跳过 OCR 定位");
-            return false;
+            return null;
         }
+        // 先隐藏倒计时悬浮窗，避免 OCR 匹配到悬浮窗自身文案后点击悬浮窗而不是真实按钮
+        String prevOverlay = hideOverlaySync();
         Bitmap bmp = takeScreenshotSync();
-        if (bmp == null) {
-            return false;
+        int[] hit = null;
+        if (bmp != null) {
+            // 词级定位：包围盒更精确，直接点词的中心
+            List<String> texts = new ArrayList<>();
+            List<Rect> rects = new ArrayList<>();
+            OcrHelper.recognizeWords(bmp, texts, rects);
+            hit = findMatch(texts, rects, keyword, pattern, prevOverlay,
+                    bmp.getWidth(), bmp.getHeight());
+            if (hit == null) {
+                // 词级未命中（关键词被拆词时），退回行级 + 行内字符位置估算
+                texts.clear();
+                rects.clear();
+                OcrHelper.recognize(bmp, texts, rects);
+                hit = findMatch(texts, rects, keyword, pattern, prevOverlay,
+                        bmp.getWidth(), bmp.getHeight());
+            }
+            bmp.recycle();
         }
-        List<String> texts = new ArrayList<>();
-        List<Rect> rects = new ArrayList<>();
-        OcrHelper.recognize(bmp, texts, rects);
-        bmp.recycle();
+        if (prevOverlay != null) {
+            showOverlayOnMain(prevOverlay);
+        }
+        return hit;
+    }
 
+    /**
+     * 在词/行文本列表中查找匹配项，返回点击中心坐标 {x, y}；未找到返回 null。
+     * keyword 非空时按 contains 匹配，否则按 pattern 匹配。
+     * 匹配短词（如"提交"）时按关键词在词内的位置修正横向中心，避免误点同行相邻词。
+     * suppress 为截图前悬浮窗显示过的文字：悬浮窗文案常包含关键词（如"准备点击【刷新签到】"），
+     * 且其位于屏幕顶部中央，为防御残留误点，跳过顶部中央区域及与悬浮窗文案高度重合的候选。
+     */
+    private static int[] findMatch(List<String> texts, List<Rect> rects, String keyword,
+                                   Pattern pattern, String suppress, int screenW, int screenH) {
+        String sup = suppress == null ? "" : suppress.replace(" ", "");
         for (int i = 0; i < texts.size(); i++) {
-            String line = texts.get(i);
-            int idx = line.indexOf(keyword);
+            String s = texts.get(i);
+            int idx;
+            int mlen;
+            if (keyword != null) {
+                idx = s.indexOf(keyword);
+                mlen = keyword.length();
+            } else {
+                Matcher m = pattern.matcher(s);
+                if (!m.find()) {
+                    continue;
+                }
+                idx = m.start();
+                mlen = m.end() - m.start();
+            }
             if (idx < 0) {
                 continue;
             }
             Rect r = rects.get(i);
-            // 行内等宽近似：按关键字在行内的字符位置估算横向中心
-            int len = Math.max(1, line.length());
-            int cx = r.left + r.width() * (idx * 2 + keyword.length()) / (2 * len);
-            int cy = r.centerY();
-            final int fx = cx;
-            final int fy = cy;
-            callOnMain(new Callable<Object>() {
-                @Override
-                public Object call() {
-                    tap(fx, fy);
-                    return null;
+            boolean overlayZone = screenH > 0 && r.top < screenH * 0.13
+                    && r.centerX() > screenW * 0.10 && r.centerX() < screenW * 0.90;
+            boolean looksLikeOverlay = s.length() > mlen
+                    && sup.length() > 0
+                    && (s.contains(sup) || sup.contains(s));
+            if (overlayZone || looksLikeOverlay) {
+                continue;
+            }
+            int cx;
+            if (s.length() <= mlen + 2) {
+                // 文本基本就是关键词本身，直接取包围盒中心
+                cx = r.centerX();
+            } else {
+                int len = Math.max(1, s.length());
+                cx = r.left + r.width() * (idx * 2 + mlen) / (2 * len);
+            }
+            return new int[]{cx, r.centerY()};
+        }
+        return null;
+    }
+
+    /**
+     * 底部栏专项检测：裁剪屏幕底部中央区域（浅色按钮所在位置），
+     * 二值化后按单行识别。用于识别 OCR 整页识别不到的浅灰色"签到未开始"按钮。
+     * 返回识别出的文字（小写比较由调用方处理），失败返回空串。
+     */
+    private String ocrBottomBarText() {
+        if (Build.VERSION.SDK_INT < 30) {
+            return "";
+        }
+        if (!OcrHelper.init(this)) {
+            return "";
+        }
+        String prevOverlay = hideOverlaySync();
+        Bitmap bmp = takeScreenshotSync();
+        String result = "";
+        if (bmp != null) {
+            int x0 = (int) (bmp.getWidth() * 0.23);
+            int x1 = (int) (bmp.getWidth() * 0.77);
+            int y0 = (int) (bmp.getHeight() * 0.915);
+            int y1 = bmp.getHeight();
+            if (x1 > x0 && y1 > y0) {
+                Bitmap region = Bitmap.createBitmap(bmp, x0, y0, x1 - x0, y1 - y0);
+                Bitmap bin = OcrHelper.binarize(region, 220);
+                if (bin != null) {
+                    result = OcrHelper.recognizeSingleLine(bin);
+                    bin.recycle();
                 }
-            });
-            log("OCR 定位并点击【" + keyword + "】@ " + cx + "," + cy);
+                region.recycle();
+            }
+            bmp.recycle();
+        }
+        if (prevOverlay != null) {
+            showOverlayOnMain(prevOverlay);
+        }
+        return result == null ? "" : result;
+    }
+
+    /** 按当前北京时间判断属于哪个签到时间段，返回芯片文字 */
+    private String currentSignInWindow() {
+        java.util.Calendar cal = java.util.Calendar.getInstance(
+                TimeZone.getTimeZone("Asia/Shanghai"));
+        int minutes = cal.get(java.util.Calendar.HOUR_OF_DAY) * 60
+                + cal.get(java.util.Calendar.MINUTE);
+        // 00:00~08:50 / 16:00~23:59
+        if (minutes <= 8 * 60 + 50) {
+            return "00:00~08:50";
+        }
+        return "16:00~23:59";
+    }
+
+    /** 点击时间段芯片：先无障碍查找，再 OCR 正则定位（OCR 对 ~ 的写法不稳定），最后按比例坐标兜底 */
+    private boolean clickTimeChip(String chip) {
+        if (clickText(chip)) {
             return true;
         }
+        // OCR 文本中 ~ 和 : 可能识别为 - ～ 5 等其他字符（如 "16:00~235:59"），用正则放宽
+        String[] parts = chip.split("~");
+        Pattern p = Pattern.compile(parts[0].replace(":", ".{0,2}")
+                + ".{0,3}" + parts[1].replace(":", ".{0,2}"));
+        if (ocrClickPattern(p, chip)) {
+            return true;
+        }
+        double[] fb = FALLBACK_COORDS.get(chip);
+        if (fb != null) {
+            int[] res = getResolution();
+            final int x = (int) (res[0] * fb[0]);
+            final int y = (int) (res[1] * fb[1]);
+            tapOnMain(x, y);
+            log("文字未找到，坐标兜底点击【" + chip + "】@ " + x + "," + y);
+            return true;
+        }
+        log("未找到时间段【" + chip + "】");
         return false;
+    }
+
+    /** 在主线程执行点击手势 */
+    private void tapOnMain(final int x, final int y) {
+        callOnMain(new Callable<Object>() {
+            @Override
+            public Object call() {
+                tap(x, y);
+                return null;
+            }
+        });
+    }
+
+    /** 从服务弹 Toast 提示 */
+    private void showToast(final String msg) {
+        runOnMain(new Runnable() {
+            @Override
+            public void run() {
+                Toast.makeText(DakaAccessibilityService.this, msg, Toast.LENGTH_LONG).show();
+            }
+        });
+    }
+
+    /** 坐标日志格式化 */
+    private static String fmtCoords(int[] p) {
+        return p == null ? "未找到" : p[0] + "," + p[1];
     }
 
     // ---------------- 倒计时悬浮提示 ----------------
@@ -789,6 +1023,7 @@ public class DakaAccessibilityService extends AccessibilityService {
 
     private void showOverlay(String text) {
         try {
+            mOverlayText = text;
             if (mOverlay == null) {
                 mOverlay = new TextView(this);
                 mOverlay.setTextColor(0xFFFFFFFF);
@@ -825,7 +1060,46 @@ public class DakaAccessibilityService extends AccessibilityService {
                     }
                     mOverlay = null;
                 }
+                mOverlayText = null;
                 return null;
+            }
+        });
+    }
+
+    /** 临时隐藏悬浮窗（OCR 截图前调用），返回之前显示的文字；无悬浮窗返回 null */
+    private String hideOverlaySync() {
+        Boolean had = callOnMain(new Callable<Boolean>() {
+            @Override
+            public Boolean call() {
+                if (mOverlay != null) {
+                    try {
+                        WindowManager wm = (WindowManager) getSystemService(Context.WINDOW_SERVICE);
+                        wm.removeView(mOverlay);
+                    } catch (Throwable ignored) {
+                    }
+                    mOverlay = null;
+                    return true;
+                }
+                return false;
+            }
+        });
+        String prev = mOverlayText;
+        if (had != null && had) {
+            mOverlayText = null;
+            // removeView 是异步的：窗口 surface 不会立刻从合成层移除，
+            // 立即截图仍会拍到悬浮窗，等待 SurfaceFlinger 完成重组后再返回
+            SystemClock.sleep(300);
+            return prev != null ? prev : "";
+        }
+        return null;
+    }
+
+    /** 在主线程恢复悬浮窗显示 */
+    private void showOverlayOnMain(final String text) {
+        runOnMain(new Runnable() {
+            @Override
+            public void run() {
+                showOverlay(text);
             }
         });
     }
