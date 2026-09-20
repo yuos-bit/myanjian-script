@@ -188,8 +188,8 @@ public class DakaAccessibilityService extends AccessibilityService {
                     log("打开最近任务查找窗口: " + miniName.trim());
                     if (openFromRecents(miniName.trim())) {
                         restored = true;
-                        // 等待 7 秒，倒计时显示 6s~0s
-                        waitCountdownFromZero(7, "等待小程序恢复");
+                        // 等待 8 秒（含小程序开屏广告），倒计时显示 7s~0s
+                        waitCountdownFromZero(8, "等待小程序恢复");
                     }
                 }
             }
@@ -212,20 +212,33 @@ public class DakaAccessibilityService extends AccessibilityService {
             clickTextWithRetry("刷新签到", 5);
             waitSeconds(1, "刷新完成，读取页面状态");
 
+            // 先按北京时间判断当前处于哪个签到时段（08:51~15:59 之间无时段，返回 null）
+            String chip = currentSignInWindow();
             String state = ocrScreenText() + " " + ocrBottomBarText();
-            if (state.contains("未开始")) {
-                // "签到未开始"按钮是浅灰字，整页 OCR 可能识别不到，所以合并底部栏专项检测
-                log("检测到【签到未开始】，本次任务结束");
-                showToast("签到未开始，请稍后重试");
-                return;
+            log("页面状态: 当前时间段=" + (chip == null ? "无" : chip)
+                    + ", 含未开始=" + state.contains("未开始")
+                    + ", 含点击开始签到=" + state.contains("开始签到"));
+
+            if (chip == null) {
+                // 不在任何签到时段：出现"未开始"才结束
+                if (state.contains("未开始")) {
+                    log("检测到【签到未开始】且当前不在签到时段，本次任务结束");
+                    showToast("签到未开始，请稍后重试");
+                    return;
+                }
+            } else if (state.contains("未开始")) {
+                // 处于签到时段内：中键文字可能尚未刷新或被误读，以时间为准继续执行
+                log("页面含【未开始】字样，但当前处于签到时段 " + chip + " 内，继续执行");
             }
 
-            // 5. 出现【点击开始签到】：按当前北京时间选择时间段，点击芯片后等待3S再点击
-            if (state.contains("点击开始签到") || state.contains("开始签到")) {
-                String chip = currentSignInWindow(); // 00:00~08:50 或 16:00~23:59
+            // 5. 点击当前时间段芯片 -> 等待3S -> 点击【点击开始签到】
+            if (chip != null) {
                 log("当前北京时间属于时间段 " + chip + "，点击对应时间段");
                 clickTimeChip(chip);
                 waitSeconds(3, "等待时间段生效");
+                clickTextWithRetry("点击开始签到", 5);
+            } else if (state.contains("开始签到")) {
+                // 时段外但页面出现了开始按钮（时间段配置可能已调整），以页面为准
                 clickTextWithRetry("点击开始签到", 5);
             } else {
                 log("未检测到【点击开始签到】，尝试直接继续");
@@ -236,6 +249,13 @@ public class DakaAccessibilityService extends AccessibilityService {
             int[] pLoc = ocrFindCoords("获取定位");
             int[] pRead = ocrFindCoords("我已阅读");
             int[] pSubmit = ocrFindCoords("提交");
+            if (pSubmit == null) {
+                // "✓ 提交"是青绿底白字且字距大，整页 OCR 常读不出，用品牌色按钮颜色定位兜底
+                pSubmit = findTealButton();
+                if (pSubmit != null) {
+                    log("OCR 未识别【提交】，颜色定位到提交按钮 @ " + pSubmit[0] + "," + pSubmit[1]);
+                }
+            }
             log("记录坐标: 获取定位=" + fmtCoords(pLoc)
                     + ", 我已阅读并同意=" + fmtCoords(pRead)
                     + ", 提交=" + fmtCoords(pSubmit));
@@ -259,8 +279,15 @@ public class DakaAccessibilityService extends AccessibilityService {
             if (pSubmit != null) {
                 tapOnMain(pSubmit[0], pSubmit[1]);
                 log("已点击【提交】@ " + pSubmit[0] + "," + pSubmit[1]);
-            } else {
-                clickTextWithRetry("提交", 8);
+            } else if (!clickTextWithRetry("提交", 8)) {
+                // 提交前最后再尝试一次颜色定位（弹窗出现后页面布局可能变化）
+                int[] p = findTealButton();
+                if (p != null) {
+                    tapOnMain(p[0], p[1]);
+                    log("已点击【提交】(颜色定位) @ " + p[0] + "," + p[1]);
+                } else {
+                    log("✘ 未找到提交按钮");
+                }
             }
 
             // 7. 等待5S后 OCR 记录【返回打卡页】坐标，等待2S后点击
@@ -774,6 +801,20 @@ public class DakaAccessibilityService extends AccessibilityService {
             s = OcrHelper.recognize(bmp, null, null);
             bmp.recycle();
         }
+        // 部分系统合成延迟更长，悬浮窗文案仍可能残留在截图中，检测到则重截一次
+        if (prevOverlay != null && !prevOverlay.isEmpty()
+                && s.replace(" ", "").contains(prevOverlay.replace(" ", ""))) {
+            log("检测到悬浮窗文案残留，重新截图识别");
+            SystemClock.sleep(500);
+            bmp = takeScreenshotSync();
+            if (bmp != null) {
+                String s2 = OcrHelper.recognize(bmp, null, null);
+                bmp.recycle();
+                if (!s2.isEmpty()) {
+                    s = s2;
+                }
+            }
+        }
         if (prevOverlay != null) {
             showOverlayOnMain(prevOverlay);
         }
@@ -787,7 +828,7 @@ public class DakaAccessibilityService extends AccessibilityService {
 
     /** OCR 定位关键词并点击中心，成功返回 true */
     private boolean ocrClick(String keyword) {
-        int[] hit = ocrLocate(keyword, null);
+        int[] hit = ocrLocate(keyword, null, 0, 0);
         if (hit == null) {
             return false;
         }
@@ -797,8 +838,9 @@ public class DakaAccessibilityService extends AccessibilityService {
     }
 
     /** OCR 定位符合正则的文本并点击中心（用于时间段芯片等写法不稳定的文字），成功返回 true */
-    private boolean ocrClickPattern(final Pattern p, final String desc) {
-        int[] hit = ocrLocate(null, p);
+    private boolean ocrClickPattern(final Pattern p, final String desc,
+                                    float minYRatio, float maxYRatio) {
+        int[] hit = ocrLocate(null, p, minYRatio, maxYRatio);
         if (hit == null) {
             return false;
         }
@@ -807,11 +849,19 @@ public class DakaAccessibilityService extends AccessibilityService {
         return true;
     }
 
-    /** OCR 整页识别关键词并记录其中心坐标（不点击），未找到返回 null */
+    /**
+     * OCR 整页识别关键词并记录其中心坐标（不点击）。
+     * 页面加载/动画期间可能一帧识别不到，首次未找到时等待 5S 再识别一次，仍未找到返回 null。
+     */
     private int[] ocrFindCoords(String keyword) {
-        int[] hit = ocrLocate(keyword, null);
+        int[] hit = ocrLocate(keyword, null, 0, 0);
         if (hit == null) {
-            log("OCR 未找到【" + keyword + "】");
+            log("OCR 未找到【" + keyword + "】，等待 5S 后重新识别");
+            SystemClock.sleep(5000);
+            hit = ocrLocate(keyword, null, 0, 0);
+        }
+        if (hit == null) {
+            log("OCR 重试仍未找到【" + keyword + "】");
             return null;
         }
         return hit;
@@ -820,8 +870,11 @@ public class DakaAccessibilityService extends AccessibilityService {
     /**
      * OCR 定位核心：截图 -> 词级匹配 -> 行级匹配，返回中心坐标 {x, y}；未找到返回 null。
      * keyword 与 pattern 至少传一个；两者都传时优先按关键词匹配。
+     * minYRatio/maxYRatio 限定候选纵屏比例范围（<=0 表示不限制），
+     * 例如时间段芯片用 (0.42, 0.78) 排除上方信息卡里出现过的同样文字。
      */
-    private int[] ocrLocate(final String keyword, final Pattern pattern) {
+    private int[] ocrLocate(final String keyword, final Pattern pattern,
+                            float minYRatio, float maxYRatio) {
         if (Build.VERSION.SDK_INT < 30) {
             return null;
         }
@@ -839,14 +892,14 @@ public class DakaAccessibilityService extends AccessibilityService {
             List<Rect> rects = new ArrayList<>();
             OcrHelper.recognizeWords(bmp, texts, rects);
             hit = findMatch(texts, rects, keyword, pattern, prevOverlay,
-                    bmp.getWidth(), bmp.getHeight());
+                    bmp.getWidth(), bmp.getHeight(), minYRatio, maxYRatio);
             if (hit == null) {
                 // 词级未命中（关键词被拆词时），退回行级 + 行内字符位置估算
                 texts.clear();
                 rects.clear();
                 OcrHelper.recognize(bmp, texts, rects);
                 hit = findMatch(texts, rects, keyword, pattern, prevOverlay,
-                        bmp.getWidth(), bmp.getHeight());
+                        bmp.getWidth(), bmp.getHeight(), minYRatio, maxYRatio);
             }
             bmp.recycle();
         }
@@ -864,7 +917,8 @@ public class DakaAccessibilityService extends AccessibilityService {
      * 且其位于屏幕顶部中央，为防御残留误点，跳过顶部中央区域及与悬浮窗文案高度重合的候选。
      */
     private static int[] findMatch(List<String> texts, List<Rect> rects, String keyword,
-                                   Pattern pattern, String suppress, int screenW, int screenH) {
+                                   Pattern pattern, String suppress, int screenW, int screenH,
+                                   float minYRatio, float maxYRatio) {
         String sup = suppress == null ? "" : suppress.replace(" ", "");
         for (int i = 0; i < texts.size(); i++) {
             String s = texts.get(i);
@@ -885,6 +939,12 @@ public class DakaAccessibilityService extends AccessibilityService {
                 continue;
             }
             Rect r = rects.get(i);
+            if (minYRatio > 0 && r.centerY() < screenH * minYRatio) {
+                continue;
+            }
+            if (maxYRatio > 0 && r.centerY() > screenH * maxYRatio) {
+                continue;
+            }
             boolean overlayZone = screenH > 0 && r.top < screenH * 0.13
                     && r.centerX() > screenW * 0.10 && r.centerX() < screenW * 0.90;
             boolean looksLikeOverlay = s.length() > mlen
@@ -943,17 +1003,124 @@ public class DakaAccessibilityService extends AccessibilityService {
         return result == null ? "" : result;
     }
 
-    /** 按当前北京时间判断属于哪个签到时间段，返回芯片文字 */
+    /**
+     * 颜色定位提交按钮：截屏后在下半屏寻找最大的青绿色实心色块
+     * （虾米签主题按钮如"✓ 提交"为青绿底白字，字距大时整页 OCR 常读不出）。
+     * 返回色块中心坐标 {x, y}；未找到返回 null。
+     */
+    private int[] findTealButton() {
+        if (Build.VERSION.SDK_INT < 30) {
+            return null;
+        }
+        if (!OcrHelper.init(this)) {
+            return null;
+        }
+        String prevOverlay = hideOverlaySync();
+        Bitmap bmp = takeScreenshotSync();
+        int[] out = null;
+        if (bmp != null) {
+            // 下限 0.60：排除时间段选中芯片（y≈0.53，同为青绿底白字）
+            out = findTealButtonIn(bmp, 0.60f, 0.97f);
+            bmp.recycle();
+        }
+        if (prevOverlay != null) {
+            showOverlayOnMain(prevOverlay);
+        }
+        return out;
+    }
+
+    /** 在位图 fromRatio~toRatio 高度范围内寻找最大青绿色连通色块，返回中心坐标 */
+    private static int[] findTealButtonIn(Bitmap bmp, float fromRatio, float toRatio) {
+        int w = bmp.getWidth(), h = bmp.getHeight();
+        int y0 = (int) (h * fromRatio), y1 = (int) (h * toRatio);
+        final int step = 8, bs = 36;
+        int gw = w / bs, gh = (y1 - y0) / bs;
+        if (gw <= 0 || gh <= 0) {
+            return null;
+        }
+        int[] score = new int[gw * gh];
+        int[] total = new int[gw * gh];
+        for (int y = y0; y < y1; y += step) {
+            int row = (y - y0) / bs;
+            if (row >= gh) {
+                row = gh - 1; // 扫描高度不是块尺寸整数倍时，末行采样归入最后一块
+            }
+            for (int x = 0; x < w; x += step) {
+                int col = x / bs;
+                if (col >= gw) {
+                    col = gw - 1;
+                }
+                int cell = row * gw + col;
+                total[cell]++;
+                if (isTeal(bmp.getPixel(x, y))) {
+                    score[cell]++;
+                }
+            }
+        }
+        // 过半采样点为品牌青绿的块视为按钮色块
+        int need = (int) ((bs / step) * (bs / step) * 0.5);
+        int best = -1, bestIdx = -1;
+        for (int i = 0; i < score.length; i++) {
+            if (score[i] >= need && score[i] > best) {
+                best = score[i];
+                bestIdx = i;
+            }
+        }
+        if (bestIdx < 0) {
+            return null;
+        }
+        // 从最密集块出发做连通扩展，得到整个按钮的包围盒
+        boolean[] used = new boolean[score.length];
+        java.util.ArrayDeque<Integer> queue = new java.util.ArrayDeque<>();
+        queue.add(bestIdx);
+        used[bestIdx] = true;
+        int minR = bestIdx / gw, maxR = minR, minC = bestIdx % gw, maxC = minC;
+        while (!queue.isEmpty()) {
+            int cur = queue.poll();
+            int r = cur / gw, c = cur % gw;
+            int[][] dirs = {{r - 1, c}, {r + 1, c}, {r, c - 1}, {r, c + 1}};
+            for (int[] d : dirs) {
+                int nr = d[0], nc = d[1];
+                if (nr < 0 || nr >= gh || nc < 0 || nc >= gw) {
+                    continue;
+                }
+                int nxt = nr * gw + nc;
+                if (used[nxt] || score[nxt] < need) {
+                    continue;
+                }
+                used[nxt] = true;
+                queue.add(nxt);
+                minR = Math.min(minR, nr);
+                maxR = Math.max(maxR, nr);
+                minC = Math.min(minC, nc);
+                maxC = Math.max(maxC, nc);
+            }
+        }
+        int cx = (minC * bs + (maxC + 1) * bs) / 2;
+        int cy = y0 + (minR * bs + (maxR + 1) * bs) / 2;
+        return new int[]{cx, cy};
+    }
+
+    /** 虾米签品牌青绿色判定（如 #2BC0AB）：绿色显著高于红色，蓝绿接近 */
+    private static boolean isTeal(int p) {
+        int r = (p >> 16) & 0xFF, g = (p >> 8) & 0xFF, b = p & 0xFF;
+        return r < 110 && g > 140 && b > 120 && g - r > 50 && Math.abs(g - b) < 60;
+    }
+
+    /** 按当前北京时间判断属于哪个签到时间段，返回芯片文字；不在任何时段返回 null */
     private String currentSignInWindow() {
         java.util.Calendar cal = java.util.Calendar.getInstance(
                 TimeZone.getTimeZone("Asia/Shanghai"));
         int minutes = cal.get(java.util.Calendar.HOUR_OF_DAY) * 60
                 + cal.get(java.util.Calendar.MINUTE);
-        // 00:00~08:50 / 16:00~23:59
+        // 00:00~08:50 / 16:00~23:59；08:51~15:59 之间不属于任何时段
         if (minutes <= 8 * 60 + 50) {
             return "00:00~08:50";
         }
-        return "16:00~23:59";
+        if (minutes >= 16 * 60) {
+            return "16:00~23:59";
+        }
+        return null;
     }
 
     /** 点击时间段芯片：先无障碍查找，再 OCR 正则定位（OCR 对 ~ 的写法不稳定），最后按比例坐标兜底 */
@@ -961,11 +1128,12 @@ public class DakaAccessibilityService extends AccessibilityService {
         if (clickText(chip)) {
             return true;
         }
-        // OCR 文本中 ~ 和 : 可能识别为 - ～ 5 等其他字符（如 "16:00~235:59"），用正则放宽
+        // OCR 文本中 ~ 和 : 可能识别为 - ～ 5 等其他字符（如 "16:00~235:59"），用正则放宽；
+        // 限定纵屏范围 42%~78%，排除上方信息卡"签到时间"行里同样的文字
         String[] parts = chip.split("~");
         Pattern p = Pattern.compile(parts[0].replace(":", ".{0,2}")
                 + ".{0,3}" + parts[1].replace(":", ".{0,2}"));
-        if (ocrClickPattern(p, chip)) {
+        if (ocrClickPattern(p, chip, 0.42f, 0.78f)) {
             return true;
         }
         double[] fb = FALLBACK_COORDS.get(chip);
@@ -1108,8 +1276,8 @@ public class DakaAccessibilityService extends AccessibilityService {
         if (had != null && had) {
             mOverlayText = null;
             // removeView 是异步的：窗口 surface 不会立刻从合成层移除，
-            // 立即截图仍会拍到悬浮窗，等待 SurfaceFlinger 完成重组后再返回
-            SystemClock.sleep(300);
+            // 立即截图仍会拍到悬浮窗；MIUI 合成延迟较长，等待 600ms 再返回
+            SystemClock.sleep(600);
             return prev != null ? prev : "";
         }
         return null;

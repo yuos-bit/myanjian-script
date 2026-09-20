@@ -367,7 +367,7 @@
                         android:textSize="12sp"/>
                 </LinearLayout>
 
-                <ScrollView
+                <com.daka.auto.LogScrollView
                     android:id="@+id/sv_log"
                     android:layout_width="match_parent"
                     android:layout_height="220dp"
@@ -376,6 +376,8 @@
                     android:fillViewport="true"
                     android:padding="12dp"
                     android:requiresFadingEdge="vertical"
+                    android:fadeScrollbars="false"
+                    android:scrollbarSize="6dp"
                     android:scrollbarStyle="insideOverlay"
                     android:scrollbarThumbVertical="@drawable/log_scrollbar_thumb"
                     android:scrollbarTrackVertical="@drawable/log_scrollbar_track"
@@ -388,10 +390,9 @@
                         android:fontFamily="monospace"
                         android:text="暂无日志"
                         android:textColor="@color/brand_log_text"
-                        android:textIsSelectable="true"
                         android:textSize="11sp"
                         android:lineSpacingExtra="2dp"/>
-                </ScrollView>
+                </com.daka.auto.LogScrollView>
             </LinearLayout>
         </LinearLayout>
     </LinearLayout>
