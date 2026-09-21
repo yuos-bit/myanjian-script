@@ -108,9 +108,6 @@ fi
     --out "daka_v$VER.apk" \
     build/app.aligned.apk
 
-# 同时复制一份 daka.apk 方便固定文件名引用
-cp -f "daka_v$VER.apk" daka.apk
-
 echo ""
-echo "OK 构建完成: $ROOT/daka_v$VER.apk (另附副本 daka.apk)"
+echo "OK 构建完成: $ROOT/daka_v$VER.apk"
 "$BT/apksigner.bat" verify --print-certs "daka_v$VER.apk" | head -5
