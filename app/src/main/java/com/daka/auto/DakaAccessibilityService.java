@@ -293,6 +293,15 @@ public class DakaAccessibilityService extends AccessibilityService {
             // 7. 等待5S后 OCR 记录【返回打卡页】坐标，等待2S后点击
             waitSeconds(5, "等待提交结果");
             int[] pBack = ocrFindCoords("返回打卡页");
+            if (pBack == null) {
+                // 成功页带视频广告时，广告画面噪声会干扰整页 OCR，
+                // 白字青绿底的"返回打卡页"易被漏识，用品牌色定位兜底
+                // （范围 28% 起：避开顶部青绿勾选圆环，覆盖成功页中部的按钮）
+                pBack = findTealButton(0.28f);
+                if (pBack != null) {
+                    log("OCR 未识别【返回打卡页】，颜色定位到按钮 @ " + pBack[0] + "," + pBack[1]);
+                }
+            }
             waitSeconds(2, "准备返回打卡页");
             if (pBack != null) {
                 tapOnMain(pBack[0], pBack[1]);
@@ -301,10 +310,11 @@ public class DakaAccessibilityService extends AccessibilityService {
                 log("未找到【返回打卡页】，尝试直接检测签到结果");
             }
 
-            // 8. 整页 OCR 检测【时间段内已签到】
+            // 8. 整页 OCR 检测【时间段内已签到】；返回失败停留在成功页时，"已成功提交"同样视为成功
             waitSeconds(2, "返回签到页");
             String result = ocrScreenText() + " " + ocrBottomBarText();
-            if (result.contains("时间段内已签到") || result.contains("已签到")) {
+            if (result.contains("时间段内已签到") || result.contains("已签到")
+                    || result.contains("已成功提交")) {
                 String now = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss", Locale.CHINA)
                         .format(new Date());
                 log("✔ 签到成功，签到时间: " + now);
@@ -1009,6 +1019,12 @@ public class DakaAccessibilityService extends AccessibilityService {
      * 返回色块中心坐标 {x, y}；未找到返回 null。
      */
     private int[] findTealButton() {
+        // 下限 0.60：排除时间段选中芯片（y≈0.53，同为青绿底白字）
+        return findTealButton(0.60f);
+    }
+
+    /** 颜色定位青绿实心按钮，fromRatio 为扫描起始高度比例（0~1） */
+    private int[] findTealButton(float fromRatio) {
         if (Build.VERSION.SDK_INT < 30) {
             return null;
         }
@@ -1019,8 +1035,7 @@ public class DakaAccessibilityService extends AccessibilityService {
         Bitmap bmp = takeScreenshotSync();
         int[] out = null;
         if (bmp != null) {
-            // 下限 0.60：排除时间段选中芯片（y≈0.53，同为青绿底白字）
-            out = findTealButtonIn(bmp, 0.60f, 0.97f);
+            out = findTealButtonIn(bmp, fromRatio, 0.97f);
             bmp.recycle();
         }
         if (prevOverlay != null) {
